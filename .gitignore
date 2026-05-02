@@ -1,0 +1,6 @@
+.codex/
+.hf-cache/
+__pycache__/
+*.pyc
+
+vendor/
