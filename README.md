@@ -13,12 +13,16 @@ The built image was tested on an MI355X host and verified with:
 
 - `build-mi35x-rocm720-py312.sh`
   - Wrapper script for `docker build`
+- `build-mi300x-rocm720-smoke.sh`
+  - MI300X smoke-test wrapper script for a lighter `gfx942-rocm720-smoke` profile
 - `docker/rocm720.Dockerfile`
   - Modified ROCm 7.2 Dockerfile
 - `docker/patch_sgl_model_gateway.py`
   - Compatibility patch for `sgl-model-gateway`
 - `docker/patch_torch_triton_metadata.py`
   - Torch metadata patch to relax the Triton requirement
+- `run-mi300x-smoke-matrix.sh`
+  - Host-side matrix runner for the README-style MI300X model, dtype, and tensor-parallel tests
 
 ## What Changed
 
@@ -58,6 +62,19 @@ You can override the tag:
 ```bash
 IMAGE_TAG=custom/image:tag \
 ./build-mi35x-rocm720-py312.sh
+```
+
+For a lighter MI300X smoke-test-oriented build that skips the heavier optional
+components during image creation, use:
+
+```bash
+./build-mi300x-rocm720-smoke.sh
+```
+
+Its default output tag is:
+
+```text
+local/sglang:v0.5.9-rocm720-mi300x-smoke-py312
 ```
 
 ## Run
@@ -126,3 +143,6 @@ curl -sS http://127.0.0.1:31000/v1/chat/completions \
 - This image is a build-oriented image, not a slim runtime-only image.
 - It contains the checked-out source trees under `/sgl-workspace`.
 - Hugging Face model downloads used during testing were bind-mounted at runtime and are not baked into the image.
+- The lighter `gfx942-rocm720-smoke` profile is intended for MI300X smoke
+  testing. It skips Mooncake, TileLang, fast-hadamard-transform, MORI, and the
+  `sgl-model-gateway` build during image creation.

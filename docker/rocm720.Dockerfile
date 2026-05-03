@@ -25,6 +25,9 @@ ENV BUILD_TRITON="0"
 ENV BUILD_LLVM="0"
 ENV BUILD_AITER_ALL="1"
 ENV BUILD_MOONCAKE="1"
+ENV BUILD_TILELANG="1"
+ENV BUILD_FHT="1"
+ENV BUILD_MODEL_GATEWAY="1"
 ENV AITER_COMMIT="v0.1.10.post3"
 
 # ===============================
@@ -35,6 +38,22 @@ ENV BUILD_TRITON="1"
 ENV BUILD_LLVM="0"
 ENV BUILD_AITER_ALL="1"
 ENV BUILD_MOONCAKE="1"
+ENV BUILD_TILELANG="1"
+ENV BUILD_FHT="1"
+ENV BUILD_MODEL_GATEWAY="1"
+ENV AITER_COMMIT="v0.1.10.post3"
+
+# ===============================
+# Base image 942 with rocm720 smoke-test profile
+FROM $BASE_IMAGE_942_ROCM720 AS gfx942-rocm720-smoke
+ENV BUILD_VLLM="0"
+ENV BUILD_TRITON="0"
+ENV BUILD_LLVM="0"
+ENV BUILD_AITER_ALL="0"
+ENV BUILD_MOONCAKE="0"
+ENV BUILD_TILELANG="0"
+ENV BUILD_FHT="0"
+ENV BUILD_MODEL_GATEWAY="0"
 ENV AITER_COMMIT="v0.1.10.post3"
 
 # ===============================
@@ -45,6 +64,9 @@ ENV BUILD_TRITON="0"
 ENV BUILD_LLVM="0"
 ENV BUILD_AITER_ALL="1"
 ENV BUILD_MOONCAKE="1"
+ENV BUILD_TILELANG="1"
+ENV BUILD_FHT="1"
+ENV BUILD_MODEL_GATEWAY="1"
 ENV AITER_COMMIT="v0.1.10.post3"
 
 # ===============================
@@ -55,6 +77,9 @@ ENV BUILD_TRITON="1"
 ENV BUILD_LLVM="0"
 ENV BUILD_AITER_ALL="1"
 ENV BUILD_MOONCAKE="1"
+ENV BUILD_TILELANG="1"
+ENV BUILD_FHT="1"
+ENV BUILD_MODEL_GATEWAY="1"
 ENV AITER_COMMIT="v0.1.10.post3"
 
 # ===============================
@@ -63,7 +88,7 @@ FROM ${GPU_ARCH}
 
 # This is necessary for scope purpose, again
 ARG GPU_ARCH=gfx950
-ENV GPU_ARCH_LIST=${GPU_ARCH%-*}
+ENV GPU_ARCH_LIST=${GPU_ARCH%%-*}
 
 ARG SGL_REPO="https://github.com/sgl-project/sglang.git"
 ARG SGL_BRANCH="v0.5.9"
@@ -242,14 +267,23 @@ ENV CARGO_BUILD_JOBS=4
 # Hot patch: sgl-model-gateway assumes the smg-wasm 1.0.0 API shape, but
 # cargo resolves 1.0.1 and the constructor/wasm_bytes signatures changed.
 COPY patch_sgl_model_gateway.py /tmp/patch_sgl_model_gateway.py
-RUN python /tmp/patch_sgl_model_gateway.py && rm -f /tmp/patch_sgl_model_gateway.py
+RUN if [ "$BUILD_MODEL_GATEWAY" = "1" ]; then \
+      python /tmp/patch_sgl_model_gateway.py; \
+    else \
+      echo "[sgl-model-gateway] Skipping patch (BUILD_MODEL_GATEWAY=${BUILD_MODEL_GATEWAY})"; \
+    fi \
+ && rm -f /tmp/patch_sgl_model_gateway.py
 
 # Build and install sgl-model-gateway
-RUN python3 -m pip install --no-cache-dir setuptools-rust \
-    && cd /sgl-workspace/sglang/sgl-model-gateway/bindings/python \
-    && /bin/bash -lc 'ulimit -n 8192 && cargo build --release' \
-    && python3 -m pip install --no-cache-dir . \
-    && rm -rf /root/.cache
+RUN if [ "$BUILD_MODEL_GATEWAY" = "1" ]; then \
+      python3 -m pip install --no-cache-dir setuptools-rust \
+      && cd /sgl-workspace/sglang/sgl-model-gateway/bindings/python \
+      && /bin/bash -lc 'ulimit -n 8192 && cargo build --release' \
+      && python3 -m pip install --no-cache-dir . \
+      && rm -rf /root/.cache; \
+    else \
+      echo "[sgl-model-gateway] Skipping build (BUILD_MODEL_GATEWAY=${BUILD_MODEL_GATEWAY})"; \
+    fi
 
 # -----------------------
 # TileLang
@@ -258,6 +292,10 @@ ENV LIBGL_ALWAYS_INDIRECT=1
 RUN echo "LC_ALL=en_US.UTF-8" >> /etc/environment
 
 RUN /bin/bash -lc 'set -euo pipefail; \
+  if [ "${BUILD_TILELANG}" != "1" ]; then \
+    echo "[TileLang] Skipping (BUILD_TILELANG=${BUILD_TILELANG})"; \
+    exit 0; \
+  fi; \
   echo "[TileLang] Building TileLang for ${GPU_ARCH}"; \
   # System dependencies (NO llvm-dev to avoid llvm-config-16 shadowing)
   apt-get update && apt-get install -y --no-install-recommends \
@@ -328,6 +366,10 @@ RUN /bin/bash -lc 'set -euo pipefail; \
 # -----------------------
 # Hadamard-transform (HIP build)
 RUN /bin/bash -lc 'set -euo pipefail; \
+    if [ "${BUILD_FHT}" != "1" ]; then \
+      echo "[FHT] Skipping (BUILD_FHT=${BUILD_FHT})"; \
+      exit 0; \
+    fi; \
     git clone --branch "${FHT_BRANCH}" "${FHT_REPO}" fast-hadamard-transform; \
     cd fast-hadamard-transform; \
     git checkout -f "${FHT_COMMIT}"; \
